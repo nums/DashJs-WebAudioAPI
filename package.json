@@ -1,0 +1,12 @@
+{
+  "name": "dashjs-webaudioapi",
+  "description": "Dashjs WebAudioApi",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Emmanuel Freard <e.freard@vi-live.fr>",
+  "dependencies": {
+    "dashjs": "git://github.com/palmerj3/dash.js-npm.git#master"
+  }
+}

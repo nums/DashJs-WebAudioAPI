@@ -1,0 +1,139 @@
+<html>
+<head>
+<script type="text/javascript" src="./node_modules/dashjs/index.js"></script>
+<script src="./js/q.js"></script>
+<script src="./js/buffer-loader.js"></script>
+<script src="./js/binauralfir.js"></script>
+<script src="./js/jquery-1.11.1.min.js"></script>
+<script src="./js/jquery.knob.js"></script>
+<style>
+	#container {
+		margin-top:10px;
+	}
+</style>
+</head>
+<body>
+<button id="waapi_init" onclick="retriverAudioBufferFromSource();">Play with web audio API</button>
+<div id="knob"></div>
+<div id="container"></div>
+
+<script type="text/javascript">
+var videoContainer = document.getElementById('container');
+var videoElement = document.createElement('video');
+videoContainer.appendChild(videoElement);
+
+MediaPlayer.dependencies.BufferExtensions.DEFAULT_MIN_BUFFER_TIME = 1;
+var context = new Dash.di.DashContext();
+var player = new MediaPlayer(context);
+
+var audioContext = new webkitAudioContext();
+var init = false;
+var playerStatus = "pause";
+var binauralFIR;
+var source;
+
+player.startup();
+//player.setAutoSwitchQuality(true)
+player.attachView(videoElement);
+player.attachSource('http://dash.edgesuite.net/digitalprimates/fraunhofer/480p_video/heaac_2_0_with_video/ElephantsDream/elephants_dream_480p_heaac2_0.mpd');
+//player.play();
+
+function retriverAudioBufferFromSource() {
+
+  if(!init) {
+    init = true;
+    audio = document.getElementsByTagName('video');
+    audio = audio[0];
+    audio.controls = "true";
+    
+    source = audioContext.createMediaElementSource(audio);
+
+    // create an anlyser node
+    var analyser = audioContext.createAnalyser();   
+    // create a gain node
+    var volume = audioContext.createGain();
+    
+    //HRTF files loading
+    var hrtfs = [];
+    var urls = [];
+    for(var i=0; i<37; i++){
+        var url = './snd/HRIR_1066_'+(i*5)+'.wav';
+        var obj = {
+            azimuth: -i*5,
+            elevation: 0,
+            distance: 1,
+            url: url
+        };
+        hrtfs.push(obj);
+        urls.push(url);
+    }
+    var p = 1;
+    for(var i=71; i>36; i--){
+        var url = './snd/HRIR_1066_'+(i*5)+'.wav';
+        var obj = {
+            azimuth: p*5,
+            elevation: 0,
+            distance: 1,
+            url: url
+        };
+        hrtfs.push(obj);
+        urls.push(url);
+        p = p + 1;
+    }
+
+    var bufferLoader = createBufferLoader();
+    binauralFIRNode = createBinauralFIR();
+
+    bufferLoader.load(urls).then(function(buffers){
+        for(var i = 0; i<buffers.length; i = i+1){
+            hrtfs[i].buffer = buffers[i];
+        }
+        binauralFIRNode.HRTFDataset = hrtfs;
+        console.log(binauralFIRNode);
+        binauralFIRNode.setPosition(0, 0, 1);
+        // Web Audio connections
+        source.connect(analyser);
+        source.connect(volume);
+        volume.connect(binauralFIRNode.input);
+        binauralFIRNode.connect(audioContext.destination);
+        binauralFIRNode.connect(analyser);
+        console.log("connections done");
+        console.log("theoretically playing");
+        audio.play();
+        playerStatus = "play";
+        document.getElementById('waapi_init').innerHTML = 'Pause';
+        document.getElementById('knob').innerHTML = '<pre>Azimuth</pre><input type="text" data-angleOffset=180 class="vs1" data-width="180" data-cursor=true data-thickness=".5" data-fgColor="#AAAAAA" data-bgColor="#FFFFFF" data-min="-180" data-max="180" data-rotation="clockwise">';
+        
+        $(".vs1").val(0);
+        //Listeners of the knobs
+        $(".vs1").knob({
+          'change' : function (v) {
+            binauralFIRNode.setPosition(v, binauralFIRNode.getPosition().elevation, binauralFIRNode.getPosition().distance);
+          },
+          'release' : function (v) {
+            binauralFIRNode.setPosition(v, binauralFIRNode.getPosition().elevation, binauralFIRNode.getPosition().distance);
+          }
+        });
+
+    })
+
+
+  }
+  else {
+    if(playerStatus == "pause") {
+      audio.play();
+      playerStatus = "play";
+      document.getElementById('waapi_init').innerHTML = 'Pause';
+    }
+    else {
+      audio.pause();  
+      playerStatus = "pause";
+      document.getElementById('waapi_init').innerHTML = 'Play';
+    }
+    
+  }
+}
+
+</script>
+
+</body>
